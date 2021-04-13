@@ -1,230 +1,72 @@
 #pragma once
-#include <vector>
+#pragma once
 using namespace std;
-typedef double real;
 
 class Test
 {
 public:
-   vector<real> f(real x, real y)
+
+   int N;
+
+   Test(const int& t_N) : N(t_N) {};
+
+   Test() : N(0){};
+
+   double f(const double& x, const double& y, const double& t)
    {
-      return  { 2 * (sin(x)),
-                2 * (sin(x)),
-                2 * (sin(x)) };
+      return -divgrad(x, y, t) * lambda() + sigma() * u(x, y, t);
    }
 
-   vector<real> lambda()
+   /*double lambda(const double& x, const double& y)
    {
-      return { 1, 1, 1 };
+      return 1;
+   }*/
+
+   double lambda()
+   {
+      return 1;
    }
 
-   vector<real> gamma()
+   double sigma()
    {
-      return { 1, 1, 1 };
+      return 1;
    }
 
-   vector<real> ug(real x, real y)
+   // Точное решение
+   double u(const double& x, const double& y, const double& t)
    {
-      return { sin(x),
-               sin(x),
-               sin(x) };
+      switch(N)
+      {
+         case(0): return 2.0;
+         case(1): return x;
+         case(2): return x * x;
+         case(3): return x * x * x;
+         case(4): return x * x * x * x;
+      };
    }
 
-   vector<real> u(real x, real y)
+   double divgrad(const double& x, const double& y, const double& t)
    {
-      return { sin(x),
-               sin(x),
-               sin(x) };
+      switch(N)
+      {
+         case(0): return 0;
+         case(1): return 0;
+         case(2): return 2;
+         case(3): return 6 * x;
+         case(4): return 12 * x * x;
+      };
+   }
+
+   // Производная точного решения по t
+   double dudt(const double& x, const double& t)
+   {
+      switch(N)
+      {
+         case(0): return 0;
+         case(1): return 3 * t * t;
+         case(2): return 0;
+         case(3): return 0;
+         case(4): return 0;
+      };
    }
 };
-
-//class Test
-//{
-//public:
-//   vector<real> f(real x, real y)
-//   {
-//      return  { -6 * (x + y) + (pow(x, 3) + pow(y, 3)),
-//                -6 * (x + y) + (pow(x, 3) + pow(y, 3)),
-//                -6 * (x + y) + (pow(x, 3) + pow(y, 3)) };
-//   }
-//
-//   vector<real> lambda()
-//   {
-//      return { 1,
-//               1,
-//               1 };
-//   }
-//
-//   vector<real> gamma()
-//   {
-//      return { 1,
-//               1,
-//               1 };
-//   }
-//
-//   vector<real> ug(real x, real y)
-//   {
-//      return { pow(x, 3) + pow(y, 3),
-//               pow(x, 3) + pow(y, 3),
-//               pow(x, 3) + pow(y, 3) };
-//   }
-//
-//   vector<real> u(real x, real y)
-//   {
-//      return { pow(x, 3) + pow(y, 3),
-//               pow(x, 3) + pow(y, 3),
-//               pow(x, 3) + pow(y, 3) };
-//   }
-//};
-
-//class Test
-//{
-//public:
-//   vector<real> f(real x, real y)
-//   {
-//      return  { 1 * (x * x + y * y),
-//                1 * (x * x + y * y),
-//                1 * (x * x + y * y) };
-//   }
-//
-//   vector<real> lambda()
-//   {
-//      return { 0,
-//               0,
-//               0 };
-//   }
-//
-//   vector<real> gamma()
-//   {
-//      return { 1,
-//               1,
-//               1 };
-//   }
-//
-//   vector<real> ug(real x, real y)
-//   {
-//      return { x * x + y * y,
-//               x * x + y * y,
-//               x * x + y * y };
-//   }
-//
-//   vector<real> u(real x, real y)
-//   {
-//      return { x * x + y * y,
-//               x * x + y * y,
-//               x * x + y * y };
-//   }
-//};
-
-//class Test
-//{
-//public:
-//   vector<real> f(real x, real y)
-//   {
-//      return  { -4 + 1 * (x * x + y * y),
-//                -4 + 1 * (x * x + y * y),
-//                -4 + 1 * (x * x + y * y) };
-//   }
-//
-//   vector<real> lambda()
-//   {
-//      return { 1,
-//               1,
-//               1 };
-//   }
-//
-//   vector<real> gamma()
-//   {
-//      return { 1,
-//               1,
-//               1 };
-//   }
-//
-//   vector<real> ug(real x, real y)
-//   {
-//      return { x * x + y * y,
-//               x * x + y * y,
-//               x * x + y * y };
-//   }
-//
-//   vector<real> u(real x, real y)
-//   {
-//      return { x * x + y * y,
-//               x * x + y * y,
-//               x * x + y * y };
-//   }
-//};
-
-//class Test
-//{
-//public:
-//   vector<real> f(real x, real y)
-//   {
-//      return  { 0,
-//                0,
-//                0 };
-//   }
-//
-//   vector<real> lambda()
-//   {
-//      return { 1,
-//               1,
-//               1 };
-//   }
-//
-//   vector<real> gamma()
-//   {
-//      return { 0,
-//               0,
-//               0 };
-//   }
-//
-//   vector<real> ug(real x, real y)
-//   {
-//      return { 5,
-//               6,
-//               7 };
-//   }
-//
-//   vector<real> u(real x, real y)
-//   {
-//      return { 5,
-//               6,
-//               7 };
-//   }
-//};
-
-//class Test
-//{
-//public:
-//   vector<real> f(real x, real y)
-//   {
-//      return  { x + y,
-//                x + y,
-//                x + y };
-//   }
-//
-//   vector<real> lambda()
-//   {
-//      return { 1, 1, 1 };
-//   }
-//
-//   vector<real> gamma()
-//   {
-//      return { 1, 1, 1 };
-//   }
-//
-//   vector<real> ug(real x, real y)
-//   {
-//      return { x + y,
-//               x + y,
-//               x + y };
-//   }
-//
-//   vector<real> u(real x, real y)
-//   {
-//      return { x + y,
-//               x + y,
-//               x + y };
-//   }
-//};

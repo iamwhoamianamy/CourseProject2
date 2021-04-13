@@ -99,7 +99,7 @@ public:
    }
 
    // Функция считывания диагонали и треугольников из файлов
-   void read_di_ggl(const string& file_name)
+   void ReadDiTr(const string& file_name)
    {
       ifstream fin;
       fin.open(file_name);

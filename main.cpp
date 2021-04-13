@@ -7,11 +7,21 @@ int main()
 {
    BoundaryValueProblem bvp;
 
-   bvp.ReadFormGrid("grid.txt");
+   bvp.ReadFormGrid("data/grid.txt");
+   bvp.ReadMatrices();
    bvp.InitializeMemory();
+   bvp.test = Test(0);
 
-   vector<int> vec(9);
    bvp.FormPortrait();
+   bvp.BuildMatrices();
+   bvp.AssembleGlobalMatrix();
+   bvp.AccountFirstBound();
+
+   bvp.Solve();
+
+   ofstream fout("result.txt");
+   bvp.PrintSolution(fout);
+   fout.close();
 
    int asdasd;
 }
