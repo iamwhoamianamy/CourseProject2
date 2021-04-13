@@ -10,7 +10,7 @@ int main()
    bvp.ReadFormGrid("data/grid.txt");
    bvp.ReadMatrices();
    bvp.InitializeMemory();
-   bvp.test = Test(0);
+   bvp.test = Test(3);
 
    bvp.FormPortrait();
    bvp.BuildMatrices();

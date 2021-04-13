@@ -132,9 +132,8 @@ public:
    // узлов конечного элемента с номером elem_index(индексация с нуля)
    void CalcGlobalIndices(int elem_index, vector<int>& global_indices)
    {
-      elem_index++;
       int n_coords = x_nodes_count / 2 + 1;
-      int k = 2 * floor((elem_index - 1) / (n_coords - 1)) * (2 * n_coords - 1) + 2 * ((elem_index - 1) % (n_coords - 1)) + 1;
+      int k = 2 * floor((elem_index) / (n_coords - 1)) * (2 * n_coords - 1) + 2 * ((elem_index) % (n_coords - 1)) + 1;
       k--;
 
       global_indices[0] = k + 0;
@@ -297,7 +296,7 @@ public:
          vector<double> local_b(9);
          M.MatVecMult(local_f, local_b, M.bot_tr, M.top_tr);
          for(int i = 0; i < 9; i++)
-            b[global_indices[i]] += hx / hy / 900.0 * local_b[i];
+            b[global_indices[i]] += hx * hy / 900.0 * local_b[i];
       }
    }
 
@@ -356,6 +355,7 @@ public:
 
       vector<double> x0(nodes_count);
       cout << slae.ConjGradPredMethod(x0, solution, global, fac_slae, fac_global) << endl;
+      //cout << slae.ConjGradMethod(x0, solution, global) << endl;
    }
 
    void PrintSolution(ofstream& fout)

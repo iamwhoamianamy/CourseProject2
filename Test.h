@@ -14,7 +14,7 @@ public:
 
    double f(const double& x, const double& y, const double& t)
    {
-      return -divgrad(x, y, t) * lambda() + sigma() * u(x, y, t);
+      return -1 * divgrad(x, y, t) * lambda() + sigma() * u(x, y, t);
    }
 
    /*double lambda(const double& x, const double& y)
@@ -39,8 +39,8 @@ public:
       {
          case(0): return 2.0;
          case(1): return x;
-         case(2): return x * x;
-         case(3): return x * x * x;
+         case(2): return x * x + y * y;
+         case(3): return x * x * x + y * y * y;
          case(4): return x * x * x * x;
       };
    }
@@ -51,8 +51,8 @@ public:
       {
          case(0): return 0;
          case(1): return 0;
-         case(2): return 2;
-         case(3): return 6 * x;
+         case(2): return 4;
+         case(3): return 6 * x + 6 * y;
          case(4): return 12 * x * x;
       };
    }
