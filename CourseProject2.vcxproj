@@ -139,7 +139,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CourseProject2.cpp" />
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BoundaryValueProblem.h" />
+    <ClInclude Include="Matrix.h" />
+    <ClInclude Include="SLAE.h" />
+    <ClInclude Include="Test.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="grid.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
