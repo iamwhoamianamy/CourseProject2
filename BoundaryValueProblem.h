@@ -2,6 +2,8 @@
 #include "Matrix.h"
 #include "SLAE.h"
 #include "Test.h"
+#include "Region.h"
+
 using namespace std;
 
 class BoundaryValueProblem
@@ -34,67 +36,184 @@ public:
    int x_nodes_count;             // Количество узлов по x
    int y_nodes_count;             // Количество узлов по y
 
+   vector<vector<int>> regions;   // Информация о подобластях (регионах)
+   int regions_count;             // Количество регионов
 
-   // Считывание и формирование сетки из файла file_name
+   vector<int> x_cords_i;         // Индексы исходных координатных линий в векторе сетки по x
+   vector<int> y_cords_i;         // Индексы исходных координатных линий в векторе сетки по y
+
+   vector<vector<int>> boundaries; // Информация о краевых условиях
+
+    // Считывание и формирование сетки из файла file_name
    void ReadFormGrid(const string& file_name)
    {
       ifstream fin(file_name);
 
-      // Координаты границы сетки
-      double left, right, bot, top;
+      // Считывание координатных линий по x
+      int x_coord_count;
+      fin >> x_coord_count;
 
-      // Считывание границы границы
-      fin >> left;
-      fin >> right;
-      fin >> bot;
-      fin >> top;
+      vector<double> x_coords(x_coord_count);
 
-      // Генерация координат узлов по x
-      int n;
-      double h, q;
+      for(int i = 0; i < x_coord_count; i++)
+         fin >> x_coords[i];
 
-      fin >> q >> n;
+      // Формирование сетки по x
+      x_nodes_count = 1;
+      x_nodes = vector<double>(1);
+      x_nodes[0] = x_coords[0];
+      vector<int> n_x(x_coord_count - 1);
 
-      x_nodes_count = n + 1;
-      x_nodes.resize(x_nodes_count);
+      for(int i = 0; i < x_coord_count - 1; i++)
+      {
+         fin >> n_x[i];
+         x_nodes.resize(x_nodes_count + n_x[i]);
 
-      h = right - left;
+         double h = (x_coords[i + 1] - x_coords[i]) / n_x[i];
 
-      if(q != 1)
-         h *= (1 - q) / (1 - pow(q, n));
-      else
-         h /= n;
+         for(int j = 0; j < n_x[i]; j++)
+            x_nodes[j + x_nodes_count] = x_nodes[x_nodes_count - 1] + h * (j + 1);
 
-      x_nodes[0] = left;
+         x_nodes_count += n_x[i];
+      }
 
-      for(int i = 0; i < n; i++)
-         x_nodes[i + 1] = x_nodes[i] + h * pow(q, i);
+      // Считывание координатных линий по y
+      int y_coord_count;
+      fin >> y_coord_count;
 
-      elems_count = n / 2;
+      vector<double> y_coords(y_coord_count);
 
-      // Генерация координат узлов по y
-      fin >> q >> n;
+      for(int i = 0; i < y_coord_count; i++)
+         fin >> y_coords[i];
 
-      y_nodes_count = n + 1;
-      y_nodes.resize(y_nodes_count);
+      // Формирование сетки по y
+      y_nodes_count = 1;
+      y_nodes = vector<double>(1);
+      y_nodes[0] = y_coords[0];
+      vector<int> n_y(y_coord_count - 1);
 
-      h = top - bot;
+      for(int i = 0; i < y_coord_count - 1; i++)
+      {
+         fin >> n_y[i];
+         y_nodes.resize(y_nodes_count + n_y[i]);
 
-      if(q != 1)
-         h *= (1 - q) / (1 - pow(q, n));
-      else
-         h /= n;
+         double h = (y_coords[i + 1] - y_coords[i]) / n_y[i];
 
-      y_nodes[0] = bot;
+         for(int j = 0; j < n_y[i]; j++)
+            y_nodes[j + y_nodes_count] = y_nodes[y_nodes_count - 1] + h * (j + 1);
 
-      for(int i = 0; i < n; i++)
-         y_nodes[i + 1] = y_nodes[i] + h * pow(q, i);
+         y_nodes_count += n_y[i];
+
+      }
+      
+      // Считывание информации о подобластях
+      fin >> regions_count;
+      regions = vector<vector<int>>(regions_count, vector<int>(4));
+
+      for(int i = 0; i < regions_count; i++)
+         fin >> regions[i][0] >> regions[i][1] >> regions[i][2] >> regions[i][3];
 
       fin.close();
 
+      // Пересчет индексов границ подобластей
+      for(int i = 1; i < n_x.size(); i++)
+         n_x[i] += n_x[i - 1];
+
+      for(int i = 1; i < n_y.size(); i++)
+         n_y[i] += n_y[i - 1];
+
+      x_cords_i = vector<int>(n_x.size() + 1);
+
+      for(int i = 0; i < n_x.size(); i++)
+         x_cords_i[i + 1] = n_x[i];
+
+      y_cords_i = vector<int>(n_y.size() + 1);
+
+      for(int i = 0; i < n_y.size(); i++)
+         y_cords_i[i + 1] = n_y[i];
+
+      for(int reg_i = 0; reg_i < regions_count; reg_i++)
+      {
+         regions[reg_i][0] = x_cords_i[regions[reg_i][0]];
+         regions[reg_i][1] = x_cords_i[regions[reg_i][1]];
+         regions[reg_i][2] = y_cords_i[regions[reg_i][2]];
+         regions[reg_i][3] = y_cords_i[regions[reg_i][3]];
+      }
+
       nodes_count = x_nodes_count * y_nodes_count;
-      elems_count *= n / 2;
+      elems_count += n_x[n_x.size() - 1] / 2 * n_y[n_y.size() - 1] / 2;
    }
+
+   // Считывание информации о краевых условиях из файла file_name
+   void ReadBoundaries(const string& file_name)
+   {
+      ifstream fin(file_name);
+
+
+
+      fin.close();
+   }
+
+   //// Считывание и формирование сетки из файла file_name
+   //void ReadFormGrid(const string& file_name)
+   //{
+   //   ifstream fin(file_name);
+
+   //   // Координаты границы сетки
+   //   double left, right, bot, top;
+
+   //   // Считывание границы границы
+   //   fin >> left;
+   //   fin >> right;
+   //   fin >> bot;
+   //   fin >> top;
+
+   //   // Генерация координат узлов по x
+   //   int n;
+   //   double h, q;
+
+   //   fin >> q >> n;
+
+   //   x_nodes_count = n + 1;
+   //   x_nodes.resize(x_nodes_count);
+
+   //   h = right - left;
+
+   //   if(q != 1)
+   //      h *= (1 - q) / (1 - pow(q, n));
+   //   else
+   //      h /= n;
+
+   //   x_nodes[0] = left;
+
+   //   for(int i = 0; i < n; i++)
+   //      x_nodes[i + 1] = x_nodes[i] + h * pow(q, i);
+
+   //   elems_count = n / 2;
+
+   //   // Генерация координат узлов по y
+   //   fin >> q >> n;
+
+   //   y_nodes_count = n + 1;
+   //   y_nodes.resize(y_nodes_count);
+
+   //   h = top - bot;
+
+   //   if(q != 1)
+   //      h *= (1 - q) / (1 - pow(q, n));
+   //   else
+   //      h /= n;
+
+   //   y_nodes[0] = bot;
+
+   //   for(int i = 0; i < n; i++)
+   //      y_nodes[i + 1] = y_nodes[i] + h * pow(q, i);
+
+   //   fin.close();
+
+   //   nodes_count = x_nodes_count * y_nodes_count;
+   //   elems_count *= n / 2;
+   //}
 
    // Считывание вспомогательных матриц для формирования
    // матриц жесткости и массы

@@ -144,6 +144,7 @@
   <ItemGroup>
     <ClInclude Include="BoundaryValueProblem.h" />
     <ClInclude Include="Matrix.h" />
+    <ClInclude Include="Region.h" />
     <ClInclude Include="SLAE.h" />
     <ClInclude Include="Test.h" />
     <ClInclude Include="Vector.h" />
