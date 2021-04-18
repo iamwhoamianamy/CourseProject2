@@ -23,6 +23,7 @@ public:
    vector<double> loc_b;          // Локальный вектор правой части
    vector<double> solution;       // Решение
    vector<double> true_solution;  // Точное решение для сравнения
+   vector<int> location;          // Положение на сетке для каждого узла
 
    Test test;                     // Информация о значениях функции,
                                   // парматров лямбда и гамма
@@ -43,6 +44,7 @@ public:
    vector<int> y_cords_i;         // Индексы исходных координатных линий в векторе сетки по y
 
    vector<vector<int>> boundaries; // Информация о краевых условиях
+   int bound_count;                // Количество краевых условий
 
     // Считывание и формирование сетки из файла file_name
    void ReadFormGrid(const string& file_name)
@@ -149,71 +151,23 @@ public:
    {
       ifstream fin(file_name);
 
+      fin >> bound_count;
 
+      boundaries = vector<vector<int>>(bound_count, vector<int>(5));
+
+      for(int bound_i = 0; bound_i < bound_count; bound_i++)
+      {
+         for(int i = 0; i < 5; i++)
+            fin >> boundaries[bound_i][i];
+
+         boundaries[bound_i][1] = x_cords_i[boundaries[bound_i][1]];
+         boundaries[bound_i][2] = x_cords_i[boundaries[bound_i][2]];
+         boundaries[bound_i][3] = y_cords_i[boundaries[bound_i][3]];
+         boundaries[bound_i][4] = y_cords_i[boundaries[bound_i][4]];
+      }
 
       fin.close();
    }
-
-   //// Считывание и формирование сетки из файла file_name
-   //void ReadFormGrid(const string& file_name)
-   //{
-   //   ifstream fin(file_name);
-
-   //   // Координаты границы сетки
-   //   double left, right, bot, top;
-
-   //   // Считывание границы границы
-   //   fin >> left;
-   //   fin >> right;
-   //   fin >> bot;
-   //   fin >> top;
-
-   //   // Генерация координат узлов по x
-   //   int n;
-   //   double h, q;
-
-   //   fin >> q >> n;
-
-   //   x_nodes_count = n + 1;
-   //   x_nodes.resize(x_nodes_count);
-
-   //   h = right - left;
-
-   //   if(q != 1)
-   //      h *= (1 - q) / (1 - pow(q, n));
-   //   else
-   //      h /= n;
-
-   //   x_nodes[0] = left;
-
-   //   for(int i = 0; i < n; i++)
-   //      x_nodes[i + 1] = x_nodes[i] + h * pow(q, i);
-
-   //   elems_count = n / 2;
-
-   //   // Генерация координат узлов по y
-   //   fin >> q >> n;
-
-   //   y_nodes_count = n + 1;
-   //   y_nodes.resize(y_nodes_count);
-
-   //   h = top - bot;
-
-   //   if(q != 1)
-   //      h *= (1 - q) / (1 - pow(q, n));
-   //   else
-   //      h /= n;
-
-   //   y_nodes[0] = bot;
-
-   //   for(int i = 0; i < n; i++)
-   //      y_nodes[i + 1] = y_nodes[i] + h * pow(q, i);
-
-   //   fin.close();
-
-   //   nodes_count = x_nodes_count * y_nodes_count;
-   //   elems_count *= n / 2;
-   //}
 
    // Считывание вспомогательных матриц для формирования
    // матриц жесткости и массы
@@ -242,6 +196,7 @@ public:
       b.resize(nodes_count);
       solution.resize(nodes_count);
       true_solution.resize(nodes_count);
+      location.resize(nodes_count);
 
       stiff_mat = Matrix(nodes_count);
       weight_mat = Matrix(nodes_count);
@@ -266,6 +221,27 @@ public:
       global_indices[6] = k + 2 * (2 * n_coords - 1);
       global_indices[7] = k + 2 * (2 * n_coords - 1) + 1;
       global_indices[8] = k + 2 * (2 * n_coords - 1) + 2;
+   }
+
+   // Поиск региона по номеру конечного элемента
+   int CalcRegionIndex(const int& elem_index)
+   {
+      int n_coords = x_nodes_count / 2 + 1;
+      int x0 = (elem_index) % (n_coords - 1) * 2 + 1;
+      int y0 = floor((elem_index) / (n_coords - 1)) * 2 + 1;
+
+      int found_reg_i = -1;
+
+      for(int reg_i = 0; reg_i < regions_count; reg_i++)
+      {
+         if(regions[reg_i][0] <= x0 && x0 <= regions[reg_i][1] &&
+            regions[reg_i][2] <= y0 && y0 <= regions[reg_i][3])
+         {
+            found_reg_i = reg_i;
+            break;
+         }
+      }
+      return found_reg_i;
    }
 
    // Вспомогательная функция для формирования портрета
@@ -373,49 +349,63 @@ public:
 
       for(int elem_i = 0; elem_i < elems_count; elem_i++)
       {
+         int reg_i = CalcRegionIndex(elem_i);
          CalcGlobalIndices(elem_i, global_indices);
 
-         vector<double> x_nodes_elem(3);       // Координаты конечного элемента по x
-         vector<double> y_nodes_elem(3);       // Координаты конечного элемента по y
-
-         CalcElemNodes(elem_i, x_nodes_elem, y_nodes_elem);
-
-         double hx = x_nodes_elem[2] - x_nodes_elem[0];
-         double hy = y_nodes_elem[2] - y_nodes_elem[0];
-
-         vector<double> local_f(9);
-         
-         for(int i = 0; i < 9; i++)
+         if(reg_i == -1)
          {
-            stiff_mat.diag[global_indices[i]] += (test.lambda() / 90.0) * (hy / hx * G1.diag[i] + hx / hy * G2.diag[i]);
-            weight_mat.diag[global_indices[i]] += (test.sigma() * hx * hy / 900.0) * M.diag[i];
-
-            local_f[i] = test.f(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], 0);
-            true_solution[global_indices[i]] = test.u(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], 0);
-
-            int beg_prof = M.ind[i];
-            int end_prof = M.ind[i + 1];
-
-            for(int i_in_prof = beg_prof; i_in_prof < end_prof; i_in_prof++)
+            for(int i = 0; i < 9; i++)
             {
-               int j = M.columns_ind[i_in_prof];
+               stiff_mat.diag[global_indices[i]] = 1;
+               weight_mat.diag[global_indices[i]] = 1;
+               b[global_indices[i]] = 0;
 
-               double val_l = (test.lambda() / 90.0) * (hy / hx * G1.bot_tr[i_in_prof] + hx / hy * G2.bot_tr[i_in_prof]);
-               double val_u = (test.lambda() / 90.0) * (hy / hx * G1.top_tr[i_in_prof] + hx / hy * G2.top_tr[i_in_prof]);
-
-               AddToMat(stiff_mat, global_indices[i], global_indices[j], val_l, val_u);
-
-               val_l = (test.sigma() * hx * hy / 900.0) * M.bot_tr[i_in_prof];
-               val_u = (test.sigma() * hx * hy / 900.0) * M.top_tr[i_in_prof];
-
-               AddToMat(weight_mat, global_indices[i], global_indices[j], val_l, val_u);
+               location[global_indices[i]] = 2;
             }
          }
+         else
+         {
+            vector<double> x_nodes_elem(3);       // Координаты конечного элемента по x
+            vector<double> y_nodes_elem(3);       // Координаты конечного элемента по y
+            CalcElemNodes(elem_i, x_nodes_elem, y_nodes_elem);
 
-         vector<double> local_b(9);
-         M.MatVecMult(local_f, local_b, M.bot_tr, M.top_tr);
-         for(int i = 0; i < 9; i++)
-            b[global_indices[i]] += hx * hy / 900.0 * local_b[i];
+            double hx = x_nodes_elem[2] - x_nodes_elem[0];
+            double hy = y_nodes_elem[2] - y_nodes_elem[0];
+
+            vector<double> local_f(9);
+
+            for(int i = 0; i < 9; i++)
+            {
+               stiff_mat.diag[global_indices[i]] += (test.lambda() / 90.0) * (hy / hx * G1.diag[i] + hx / hy * G2.diag[i]);
+               weight_mat.diag[global_indices[i]] += (test.sigma() * hx * hy / 900.0) * M.diag[i];
+
+               local_f[i] = test.f(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], 0);
+               true_solution[global_indices[i]] = test.u(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], 0);
+
+               int beg_prof = M.ind[i];
+               int end_prof = M.ind[i + 1];
+
+               for(int i_in_prof = beg_prof; i_in_prof < end_prof; i_in_prof++)
+               {
+                  int j = M.columns_ind[i_in_prof];
+
+                  double val_l = (test.lambda() / 90.0) * (hy / hx * G1.bot_tr[i_in_prof] + hx / hy * G2.bot_tr[i_in_prof]);
+                  double val_u = (test.lambda() / 90.0) * (hy / hx * G1.top_tr[i_in_prof] + hx / hy * G2.top_tr[i_in_prof]);
+
+                  AddToMat(stiff_mat, global_indices[i], global_indices[j], val_l, val_u);
+
+                  val_l = (test.sigma() * hx * hy / 900.0) * M.bot_tr[i_in_prof];
+                  val_u = (test.sigma() * hx * hy / 900.0) * M.top_tr[i_in_prof];
+
+                  AddToMat(weight_mat, global_indices[i], global_indices[j], val_l, val_u);
+               }
+            }
+
+            vector<double> local_b(9);
+            M.MatVecMult(local_f, local_b, M.bot_tr, M.top_tr);
+            for(int i = 0; i < 9; i++)
+               b[global_indices[i]] += hx * hy / 900.0 * local_b[i];
+         }
       }
    }
 
@@ -435,8 +425,9 @@ public:
    void FirstBoundOnLine(const int& line_i, const double& x, const double& y, const double& t)
    {
       global.diag[line_i] = 1;
-
+      true_solution[line_i] = test.u(x, y, 0);
       b[line_i] = test.u(x, y, t);
+
 
       for(int prof_i = global.ind[line_i]; prof_i < global.ind[line_i + 1]; prof_i++)
       {
@@ -460,8 +451,17 @@ public:
       {
          for(int y_i = 0; y_i < y_nodes_count; y_i++)
          {
-            if(x_i == 0 || x_i == x_nodes_count - 1 ||  y_i == 0 || y_i == y_nodes_count - 1)
-               FirstBoundOnLine(x_i + y_i * x_nodes_count, x_nodes[x_i], y_nodes[y_i], 0);
+            for(int bound_i = 0; bound_i < bound_count; bound_i++)
+            {
+               if(boundaries[bound_i][1] <= x_i && x_i <= boundaries[bound_i][2] &&
+                  boundaries[bound_i][3] <= y_i && y_i <= boundaries[bound_i][4])
+               {
+                  int i = x_i + y_i * x_nodes_count;
+                  FirstBoundOnLine(i, x_nodes[x_i], y_nodes[y_i], 0);
+                  location[i] = 1;
+                  break;
+               }
+            }
          }
       }
    }
@@ -496,11 +496,33 @@ public:
             fout << setw(14) << abs(true_solution[i] - solution[i]);
             fout << fixed << setw(5) << i;
 
-            if(x_i == 0 || x_i == x_nodes_count - 1 || y_i == 0 || y_i == y_nodes_count - 1)
+            
+            if(location[i] == 2)
+               fout << " outer";
+            else if(location[i] == 1)
                fout << " border";
             else
                fout << " inner";
 
+
+            /*else
+            {
+               bool found_border = false;
+               for(int bound_i = 0; bound_i < bound_count; bound_i++)
+               {
+                  if(boundaries[bound_i][1] <= x_i && x_i <= boundaries[bound_i][2] &&
+                     boundaries[bound_i][3] <= y_i && y_i <= boundaries[bound_i][4])
+                  {
+                     found_border = true;
+                     break;
+                  }
+               }
+
+               if(found_border)
+                  fout << " border";
+               else
+                  fout << " inner";
+            }*/
             fout << endl;
          }
       }
