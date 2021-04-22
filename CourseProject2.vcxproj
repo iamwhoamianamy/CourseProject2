@@ -152,6 +152,7 @@
   <ItemGroup>
     <Text Include="data\boundaries.txt" />
     <Text Include="data\grid.txt" />
+    <Text Include="data\time.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

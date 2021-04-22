@@ -12,7 +12,8 @@ public:
    Matrix global;                 // Глобальная матрица
    Matrix fac_global;             // Неполная факторизация глобальной матрицы
    Matrix stiff_mat;              // Матрица жесткости
-   Matrix weight_mat;             // Матрица масс
+   Matrix sigma_mass_mat;         // Матрица массы для параметра Сигма
+   Matrix chi_mass_mat;           // Матрица массы для параметра Хи
    Matrix G1, G2, M;              // Вспомогательные матрицы для вычисления элементов
                                   // локальных матриц и векторов правых частей
 
@@ -22,6 +23,9 @@ public:
    vector<double> b;              // Глобальный вектор правой части
    vector<double> loc_b;          // Локальный вектор правой части
    vector<double> solution;       // Решение
+   vector<double> prev_solution1; // Решение на предыдущей временной итерации
+   vector<double> prev_solution2; // Решение на предпредыдущей временной итерации
+   vector<double> prev_solution3; // Решение на предпредпредыдущей временной итерации
    vector<double> true_solution;  // Точное решение для сравнения
    vector<int> location;          // Положение на сетке для каждого узла
 
@@ -45,6 +49,35 @@ public:
 
    vector<vector<int>> boundaries; // Информация о краевых условиях
    int bound_count;                // Количество краевых условий
+
+   vector<double> time_grid;       // Сетка по времени
+   int timesteps_count;            // Количество временных слоев
+
+   vector<double> Mnqj_1;          // Вспомогательный вектор для итерации по времени
+   vector<double> Mnqj_2;          // Вспомогательный вектор для итерации по времени
+   vector<double> Mnqj_3;          // Вспомогательный вектор для итерации по времени
+
+   vector<double> Moqj_1;          // Вспомогательный вектор для итерации по времени
+   vector<double> Moqj_2;          // Вспомогательный вектор для итерации по времени
+   vector<double> Moqj_3;          // Вспомогательный вектор для итерации по времени
+
+   void ReadFormTimeGrid(const string& file_name)
+   {
+      ifstream fin(file_name);
+
+      double t_last;
+      fin >> t_last;
+      fin >> timesteps_count;
+      timesteps_count++;
+
+      time_grid = vector<double>(timesteps_count);
+      double h = t_last / (timesteps_count - 1);
+
+      for(int i = 1; i < timesteps_count; i++)
+         time_grid[i] = h * i;
+
+      fin.close();
+   }
 
     // Считывание и формирование сетки из файла file_name
    void ReadFormGrid(const string& file_name)
@@ -190,16 +223,29 @@ public:
       slae = SLAE(nodes_count, 10000, 1e-20);
       fac_slae = SLAE(nodes_count, 10000, 1e-20);
 
-      fac_global = Matrix(nodes_count, 0);
+      global.ind = vector<int>(nodes_count + 1);
+      b = vector<double>(nodes_count);
 
-      global.ind.resize(nodes_count + 1);
-      b.resize(nodes_count);
-      solution.resize(nodes_count);
-      true_solution.resize(nodes_count);
-      location.resize(nodes_count);
+      solution = vector<double>(nodes_count);
+      prev_solution1 = vector<double>(nodes_count);
+      prev_solution2 = vector<double>(nodes_count);
+      prev_solution3 = vector<double>(nodes_count);
+      true_solution = vector<double>(nodes_count);
+
+      location = vector<int>(nodes_count);
+
+      Mnqj_1 = vector<double>(nodes_count);
+      Mnqj_2 = vector<double>(nodes_count);
+      Mnqj_3 = vector<double>(nodes_count);
+
+      Moqj_1 = vector<double>(nodes_count);
+      Moqj_2 = vector<double>(nodes_count);
+      Moqj_3 = vector<double>(nodes_count);
 
       stiff_mat = Matrix(nodes_count);
-      weight_mat = Matrix(nodes_count);
+      sigma_mass_mat = Matrix(nodes_count);
+      chi_mass_mat = Matrix(nodes_count);
+      fac_global = Matrix(nodes_count, 0);
    }
 
    // Заполнение массива global_indices индексами, соответствующими глобальной номерации
@@ -278,10 +324,12 @@ public:
    {
       global.ind[0] = global.ind[1] = 0;
 
-      for(int i = 0; i < elems_count; i++)
+      for(int elem_i = 0; elem_i < elems_count; elem_i++)
       {
+         int reg_i = CalcRegionIndex(elem_i);
+
          vector<int> global_indices(9);
-         CalcGlobalIndices(i, global_indices);
+         CalcGlobalIndices(elem_i, global_indices);
          vector<vector<vector<int>>> help(9);
 
          for(int i = 0; i < 9; i++)
@@ -305,7 +353,8 @@ public:
       global.top_tr.resize(global.tr_size);
 
       stiff_mat = global;
-      weight_mat = global;
+      sigma_mass_mat = global;
+      chi_mass_mat = global;
    }
 
    // Добавление элемента в матрицу
@@ -343,7 +392,7 @@ public:
    }
 
    // Сборка матриц жесткости и массы
-   void BuildMatrices()
+   void BuildMatrices(const double& t)
    {
       vector<int> global_indices(9);
 
@@ -357,7 +406,8 @@ public:
             for(int i = 0; i < 9; i++)
             {
                stiff_mat.diag[global_indices[i]] = 1;
-               weight_mat.diag[global_indices[i]] = 1;
+               sigma_mass_mat.diag[global_indices[i]] = 1;
+               chi_mass_mat.diag[global_indices[i]] = 1;
                b[global_indices[i]] = 0;
 
                location[global_indices[i]] = 2;
@@ -377,10 +427,11 @@ public:
             for(int i = 0; i < 9; i++)
             {
                stiff_mat.diag[global_indices[i]] += (test.lambda() / 90.0) * (hy / hx * G1.diag[i] + hx / hy * G2.diag[i]);
-               weight_mat.diag[global_indices[i]] += (test.sigma() * hx * hy / 900.0) * M.diag[i];
+               sigma_mass_mat.diag[global_indices[i]] += (test.sigma() * hx * hy / 900.0) * M.diag[i];
+               chi_mass_mat.diag[global_indices[i]] += (test.chi() * hx * hy / 900.0) * M.diag[i];
 
-               local_f[i] = test.f(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], 0);
-               true_solution[global_indices[i]] = test.u(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], 0);
+               local_f[i] = test.f(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], t);
+               true_solution[global_indices[i]] = test.u(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], t);
 
                int beg_prof = M.ind[i];
                int end_prof = M.ind[i + 1];
@@ -397,7 +448,12 @@ public:
                   val_l = (test.sigma() * hx * hy / 900.0) * M.bot_tr[i_in_prof];
                   val_u = (test.sigma() * hx * hy / 900.0) * M.top_tr[i_in_prof];
 
-                  AddToMat(weight_mat, global_indices[i], global_indices[j], val_l, val_u);
+                  AddToMat(sigma_mass_mat, global_indices[i], global_indices[j], val_l, val_u);
+
+                  val_l = (test.chi() * hx * hy / 900.0) * M.bot_tr[i_in_prof];
+                  val_u = (test.chi() * hx * hy / 900.0) * M.top_tr[i_in_prof];
+
+                  AddToMat(chi_mass_mat, global_indices[i], global_indices[j], val_l, val_u);
                }
             }
 
@@ -413,19 +469,20 @@ public:
    void AssembleGlobalMatrix()
    {
       for(int i = 0; i < nodes_count; i++)
-         global.diag[i] = stiff_mat.diag[i] + weight_mat.diag[i];
+         global.diag[i] = stiff_mat.diag[i] + sigma_mass_mat.diag[i] + chi_mass_mat.diag[i];
 
       for(int i = 0; i < global.tr_size; i++)
       {
-         global.bot_tr[i] = stiff_mat.bot_tr[i] + weight_mat.bot_tr[i];
-         global.top_tr[i] = stiff_mat.top_tr[i] + weight_mat.top_tr[i];
+         global.bot_tr[i] = stiff_mat.bot_tr[i] + sigma_mass_mat.bot_tr[i] + chi_mass_mat.bot_tr[i];
+         global.top_tr[i] = stiff_mat.top_tr[i] + sigma_mass_mat.top_tr[i] + chi_mass_mat.top_tr[i];
       }
    }
 
+   // Учет первых краевых условий на строкес с номером line_i
    void FirstBoundOnLine(const int& line_i, const double& x, const double& y, const double& t)
    {
       global.diag[line_i] = 1;
-      true_solution[line_i] = test.u(x, y, 0);
+      true_solution[line_i] = test.u(x, y, t);
       b[line_i] = test.u(x, y, t);
 
 
@@ -445,7 +502,7 @@ public:
    }
 
    // Учет первых краевых условий
-   void AccountFirstBound()
+   void AccountFirstBound(const double& t)
    {
       for(int x_i = 0; x_i < x_nodes_count; x_i++)
       {
@@ -457,7 +514,7 @@ public:
                   boundaries[bound_i][3] <= y_i && y_i <= boundaries[bound_i][4])
                {
                   int i = x_i + y_i * x_nodes_count;
-                  FirstBoundOnLine(i, x_nodes[x_i], y_nodes[y_i], 0);
+                  FirstBoundOnLine(i, x_nodes[x_i], y_nodes[y_i], t);
                   location[i] = 1;
                   break;
                }
@@ -474,11 +531,109 @@ public:
 
       vector<double> x0(nodes_count);
       cout << slae.ConjGradPredMethod(x0, solution, global, fac_slae, fac_global) << endl;
-      //cout << slae.ConjGradMethod(x0, solution, global) << endl;
    }
 
-   void PrintSolution(ofstream& fout)
+   // Итерации по времени, вывод в поток fout
+   void TimeIterations(ofstream& fout)
    {
+      for(int y_i = 0; y_i < y_nodes_count; y_i++)
+         for(int x_i = 0; x_i < x_nodes_count; x_i++)
+         {
+            prev_solution3[x_i + y_i * x_nodes_count] =
+               test.u(x_nodes[x_i], y_nodes[y_i], time_grid[0]);
+
+            prev_solution2[x_i + y_i * x_nodes_count] =
+               test.u(x_nodes[x_i], y_nodes[y_i], time_grid[1]);
+
+            prev_solution1[x_i + y_i * x_nodes_count] =
+               test.u(x_nodes[x_i], y_nodes[y_i], time_grid[2]);
+         }
+
+      for(int time_i = 3; time_i < timesteps_count; time_i++)
+      {
+         // Временные слои
+         double t3 = time_grid[time_i - 3];
+         double t2 = time_grid[time_i - 2];
+         double t1 = time_grid[time_i - 1];
+         double t0 = time_grid[time_i - 0];
+
+         // Числители дробей
+         double den3 = (t3 - t2) * (t3 - t1) * (t3 - t0);
+         double den2 = (t2 - t3) * (t2 - t1) * (t2 - t0);
+         double den1 = (t1 - t3) * (t1 - t2) * (t1 - t0);
+         double den0 = (t0 - t3) * (t0 - t2) * (t0 - t1);
+
+         // Первые произодные
+         double n3 = (3 * t0 * t0 - 2 * t0 * t2 - 2 * t0 * t1 - 2 * t0 * t0 +
+                      t2 * t1 + t2 * t0 + t1 * t0) / den3;
+
+         double n2 = (3 * t0 * t0 - 2 * t0 * t3 - 2 * t0 * t1 - 2 * t0 * t0 +
+                      t3 * t1 + t3 * t0 + t1 * t0) / den2;
+
+         double n1 = (3 * t0 * t0 - 2 * t0 * t3 - 2 * t0 * t2 - 2 * t0 * t0 +
+                      t3 * t2 + t3 * t0 + t2 * t0) / den1;
+
+         double n0 = (3 * t0 * t0 - 2 * t0 * t3 - 2 * t0 * t2 - 2 * t0 * t1 +
+                      t3 * t2 + t3 * t1 + t2 * t1) / den0;
+
+         // Вторые производные
+         double o3 = (6 * t0 - 2 * t2 - 2 * t1 - 2 * t0) / den3;
+         double o2 = (6 * t0 - 2 * t3 - 2 * t1 - 2 * t0) / den2;
+         double o1 = (6 * t0 - 2 * t3 - 2 * t2 - 2 * t0) / den1;
+         double o0 = (6 * t0 - 2 * t3 - 2 * t2 - 2 * t1) / den0;
+
+         sigma_mass_mat.ResetValues();
+         chi_mass_mat.ResetValues();
+         stiff_mat.ResetValues();
+         global.ResetValues();
+
+         for(int i = 0; i < nodes_count; i++)
+            b[i] = 0;
+
+         BuildMatrices(t0);
+
+         sigma_mass_mat.MatVecMult(prev_solution1, Mnqj_1, sigma_mass_mat.bot_tr, sigma_mass_mat.top_tr);
+         sigma_mass_mat.MatVecMult(prev_solution2, Mnqj_2, sigma_mass_mat.bot_tr, sigma_mass_mat.top_tr);
+         sigma_mass_mat.MatVecMult(prev_solution3, Mnqj_3, sigma_mass_mat.bot_tr, sigma_mass_mat.top_tr);
+
+         chi_mass_mat.MatVecMult(prev_solution1, Moqj_1, chi_mass_mat.bot_tr, chi_mass_mat.top_tr);
+         chi_mass_mat.MatVecMult(prev_solution2, Moqj_2, chi_mass_mat.bot_tr, chi_mass_mat.top_tr);
+         chi_mass_mat.MatVecMult(prev_solution3, Moqj_3, chi_mass_mat.bot_tr, chi_mass_mat.top_tr);
+
+         for(int i = 0; i < nodes_count; i++)
+         {
+            Mnqj_1[i] *= n1;
+            Mnqj_2[i] *= n2;
+            Mnqj_3[i] *= n3;
+
+            Moqj_1[i] *= o1;
+            Moqj_2[i] *= o2;
+            Moqj_3[i] *= o3;
+         }
+
+         sigma_mass_mat.Mult(n0);
+         chi_mass_mat.Mult(o0);
+
+         AssembleGlobalMatrix();
+
+         for(int i = 0; i < nodes_count; i++)
+            b[i] -= Mnqj_1[i] + Mnqj_2[i] + Mnqj_3[i] + Moqj_1[i] + Moqj_2[i] + Moqj_3[i];
+
+         AccountFirstBound(t0);
+         Solve();
+
+         PrintSolution(fout, t0);
+
+         prev_solution3 = prev_solution2;
+         prev_solution2 = prev_solution1;
+         prev_solution1 = solution;
+      }
+   }
+
+   // Вывод решения на временном слое t в поток fout 
+   void PrintSolution(ofstream& fout, const double& t)
+   {
+      fout << "t = " << t << endl;
       fout << setw(14) << "x" << setw(14) << "y";
       fout << setw(14) << "prec" << setw(14) << "calc" << setw(14) << "diff" << setw(5) << "n" << " loc" << endl;
 

@@ -116,6 +116,32 @@ public:
 
       fin.close();
    }
+
+   // Зануление всех элементов матрицы
+   void ResetValues()
+   {
+      for(int i = 0; i < size; i++)
+         diag[i] = 0;
+
+      for(int i = 0; i < tr_size; i++)
+      {
+         bot_tr[i] = 0;
+         top_tr[i] = 0;
+      }
+   }
+
+   // Умножение матрицы на число
+   void Mult(const double& val)
+   {
+      for(int i = 0; i < size; i++)
+         diag[i] *= val;
+
+      for(int i = 0; i < tr_size; i++)
+      {
+         bot_tr[i] *= val;
+         top_tr[i] *= val;
+      }
+   }
 };
 
 //// Умножение матрицы на число
