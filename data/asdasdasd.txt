@@ -20,10 +20,10 @@ public:
 
    double lambda(const double& x, const double& y)
    {
-      return 5 * x;
+      return 1;
    }
 
-   // Точное решение
+   // РўРѕС‡РЅРѕРµ СЂРµС€РµРЅРёРµ
    double u(const double& x, const double& y, const double& t)
    {
       switch(N)
@@ -41,7 +41,6 @@ public:
       switch(N)
       {
          case(0): return 0;
-         case(1): return 5;
       };
    }
 
@@ -55,7 +54,7 @@ public:
       return 1;
    }
 
-   // Производная точного решения по t
+   // РџСЂРѕРёР·РІРѕРґРЅР°СЏ С‚РѕС‡РЅРѕРіРѕ СЂРµС€РµРЅРёСЏ РїРѕ t
    double dudt(const double& x, const double& y, const double& t)
    {
       switch(N)
@@ -68,7 +67,7 @@ public:
       };
    }
 
-   // Вторая производная точного решения по t
+   // Р’С‚РѕСЂР°СЏ РїСЂРѕРёР·РІРѕРґРЅР°СЏ С‚РѕС‡РЅРѕРіРѕ СЂРµС€РµРЅРёСЏ РїРѕ t
    double d2udt2(const double& x, const double& y, const double& t)
    {
       switch(N)

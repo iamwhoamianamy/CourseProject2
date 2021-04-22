@@ -17,6 +17,8 @@ public:
    Matrix G1, G2, M;              // Вспомогательные матрицы для вычисления элементов
                                   // локальных матриц и векторов правых частей
 
+   vector<Matrix> Gl, Gr;
+
    SLAE slae;                     // Решатель системы без предобуславливания
    SLAE fac_slae;                 // Решатель системы c предобуславливанием
 
@@ -215,13 +217,26 @@ public:
 
       M = Matrix(9);
       M.ReadDiTr("data/M1.txt");
+
+      Gl = vector<Matrix>(4, Matrix(9));
+      Gl[0].ReadDiTr("data/Gl0.txt");
+      Gl[1].ReadDiTr("data/Gl1.txt");
+      Gl[2].ReadDiTr("data/Gl2.txt");
+      Gl[3].ReadDiTr("data/Gl3.txt");
+
+      Gr = vector<Matrix>(4, Matrix(9));
+      Gr[0].ReadDiTr("data/Gr0.txt");
+      Gr[1].ReadDiTr("data/Gr1.txt");
+      Gr[2].ReadDiTr("data/Gr2.txt");
+      Gr[3].ReadDiTr("data/Gr3.txt");
+
    }
 
    // Выделение памяти под массивы
    void InitializeMemory()
    {
-      slae = SLAE(nodes_count, 10000, 1e-20);
-      fac_slae = SLAE(nodes_count, 10000, 1e-20);
+      slae = SLAE(nodes_count, 1000, 1e-20);
+      fac_slae = SLAE(nodes_count, 1000, 1e-20);
 
       global.ind = vector<int>(nodes_count + 1);
       b = vector<double>(nodes_count);
@@ -424,14 +439,27 @@ public:
 
             vector<double> local_f(9);
 
+            vector<double> lambda {
+                  test.lambda(x_nodes_elem[0], y_nodes_elem[0]),
+                  test.lambda(x_nodes_elem[0], y_nodes_elem[2]),
+                  test.lambda(x_nodes_elem[2], y_nodes_elem[0]),
+                  test.lambda(x_nodes_elem[2], y_nodes_elem[2]) };
+
             for(int i = 0; i < 9; i++)
             {
-               stiff_mat.diag[global_indices[i]] += (test.lambda() / 90.0) * (hy / hx * G1.diag[i] + hx / hy * G2.diag[i]);
+               double x = x_nodes_elem[i % 3];
+               double y = y_nodes_elem[floor(i / 3)];
+
+               //stiff_mat.diag[global_indices[i]] += (test.lambda(x, y) / 90.0) * (hy / hx * G1.diag[i] + hx / hy * G2.diag[i]);
+               stiff_mat.diag[global_indices[i]] += (1.0 / 90.0) * 
+                  (hy / hx * (Gl[0].diag[i] * lambda[0] + Gl[1].diag[i] * lambda[1] + Gl[2].diag[i] * lambda[2] + Gl[3].diag[i] * lambda[3]) +
+                   hx / hy * (Gr[0].diag[i] * lambda[0] + Gr[1].diag[i] * lambda[1] + Gr[2].diag[i] * lambda[2] + Gr[3].diag[i] * lambda[3]));
+
                sigma_mass_mat.diag[global_indices[i]] += (test.sigma() * hx * hy / 900.0) * M.diag[i];
                chi_mass_mat.diag[global_indices[i]] += (test.chi() * hx * hy / 900.0) * M.diag[i];
 
                local_f[i] = test.f(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], t);
-               true_solution[global_indices[i]] = test.u(x_nodes_elem[i % 3], y_nodes_elem[floor(i / 3)], t);
+               true_solution[global_indices[i]] = test.u(x, y, t);
 
                int beg_prof = M.ind[i];
                int end_prof = M.ind[i + 1];
@@ -440,8 +468,14 @@ public:
                {
                   int j = M.columns_ind[i_in_prof];
 
-                  double val_l = (test.lambda() / 90.0) * (hy / hx * G1.bot_tr[i_in_prof] + hx / hy * G2.bot_tr[i_in_prof]);
-                  double val_u = (test.lambda() / 90.0) * (hy / hx * G1.top_tr[i_in_prof] + hx / hy * G2.top_tr[i_in_prof]);
+                  //double val_l = (test.lambda(x, y) / 90.0) * (hy / hx * G1.bot_tr[i_in_prof] + hx / hy * G2.bot_tr[i_in_prof]);
+                  double val_l = (1.0 / 90.0) * 
+                     (hy / hx * (Gl[0].bot_tr[i_in_prof] * lambda[0] + Gl[1].bot_tr[i_in_prof] * lambda[1] + Gl[2].bot_tr[i_in_prof] * lambda[2] + Gl[3].bot_tr[i_in_prof] * lambda[3]) +
+                      hx / hy * (Gr[0].bot_tr[i_in_prof] * lambda[0] + Gr[1].bot_tr[i_in_prof] * lambda[1] + Gr[2].bot_tr[i_in_prof] * lambda[2] + Gr[3].bot_tr[i_in_prof] * lambda[3]));
+                  //double val_u = (test.lambda(x, y) / 90.0) * (hy / hx * G1.top_tr[i_in_prof] + hx / hy * G2.top_tr[i_in_prof]);
+                  double val_u = (1.0 / 90.0) * 
+                     (hy / hx * (Gl[0].top_tr[i_in_prof] * lambda[0] + Gl[1].top_tr[i_in_prof] * lambda[1] + Gl[2].top_tr[i_in_prof] * lambda[2] + Gl[3].top_tr[i_in_prof] * lambda[3]) +
+                      hx / hy * (Gr[0].top_tr[i_in_prof] * lambda[0] + Gr[1].top_tr[i_in_prof] * lambda[1] + Gr[2].top_tr[i_in_prof] * lambda[2] + Gr[3].top_tr[i_in_prof] * lambda[3]));
 
                   AddToMat(stiff_mat, global_indices[i], global_indices[j], val_l, val_u);
 
@@ -623,6 +657,7 @@ public:
          Solve();
 
          PrintSolution(fout, t0);
+         fout << endl;
 
          prev_solution3 = prev_solution2;
          prev_solution2 = prev_solution1;
@@ -633,7 +668,7 @@ public:
    // Вывод решения на временном слое t в поток fout 
    void PrintSolution(ofstream& fout, const double& t)
    {
-      fout << "t = " << t << endl;
+      fout << "t = " << fixed << t << endl;
       fout << setw(14) << "x" << setw(14) << "y";
       fout << setw(14) << "prec" << setw(14) << "calc" << setw(14) << "diff" << setw(5) << "n" << " loc" << endl;
 
@@ -659,25 +694,6 @@ public:
             else
                fout << " inner";
 
-
-            /*else
-            {
-               bool found_border = false;
-               for(int bound_i = 0; bound_i < bound_count; bound_i++)
-               {
-                  if(boundaries[bound_i][1] <= x_i && x_i <= boundaries[bound_i][2] &&
-                     boundaries[bound_i][3] <= y_i && y_i <= boundaries[bound_i][4])
-                  {
-                     found_border = true;
-                     break;
-                  }
-               }
-
-               if(found_border)
-                  fout << " border";
-               else
-                  fout << " inner";
-            }*/
             fout << endl;
          }
       }
