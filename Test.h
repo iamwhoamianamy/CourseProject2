@@ -20,7 +20,7 @@ public:
 
    double lambda(const double& x, const double& y)
    {
-      return 5 * x;
+      return x * x;
    }
 
    // Точное решение
@@ -41,7 +41,7 @@ public:
       switch(N)
       {
          case(0): return 0;
-         case(1): return 5;
+         case(1): return 2 * x;
       };
    }
 

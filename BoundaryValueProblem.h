@@ -14,7 +14,7 @@ public:
    Matrix stiff_mat;              // Матрица жесткости
    Matrix sigma_mass_mat;         // Матрица массы для параметра Сигма
    Matrix chi_mass_mat;           // Матрица массы для параметра Хи
-   Matrix G1, G2, M;              // Вспомогательные матрицы для вычисления элементов
+   Matrix  M;                     // Вспомогательные матрицы для вычисления элементов
                                   // локальных матриц и векторов правых частей
 
    vector<Matrix> Gl, Gr;
@@ -209,12 +209,6 @@ public:
    void ReadMatrices()
    {
       // Чтение вспомогательных матриц для построения матриц жесткости и массы
-      G1 = Matrix(9);
-      G1.ReadDiTr("data/G1.txt");
-
-      G2 = Matrix(9);
-      G2.ReadDiTr("data/G2.txt");
-
       M = Matrix(9);
       M.ReadDiTr("data/M1.txt");
 
@@ -343,21 +337,24 @@ public:
       {
          int reg_i = CalcRegionIndex(elem_i);
 
-         vector<int> global_indices(9);
-         CalcGlobalIndices(elem_i, global_indices);
-         vector<vector<vector<int>>> help(9);
+         //if(reg_i != -1)
+         {
+            vector<int> global_indices(9);
+            CalcGlobalIndices(elem_i, global_indices);
+            vector<vector<vector<int>>> help(9);
 
-         for(int i = 0; i < 9; i++)
-            help[i].resize(9);
+            for(int i = 0; i < 9; i++)
+               help[i].resize(9);
 
-         for(int i = 0; i < 9; i++)
-            for(int j = 0; j < 9; j++)
-               help[i][j] = { global_indices[i], global_indices[j] };
+            for(int i = 0; i < 9; i++)
+               for(int j = 0; j < 9; j++)
+                  help[i][j] = { global_indices[i], global_indices[j] };
 
 
-         for(int i = 0; i < 9; i++)
-            for(int j = 0; j < i; j++)
-               IncertToRow(help[i][j][0], help[i][j][1]);
+            for(int i = 0; i < 9; i++)
+               for(int j = 0; j < i; j++)
+                  IncertToRow(help[i][j][0], help[i][j][1]);
+         }
       }
 
       global.size = global.ind.size() - 1;
@@ -421,10 +418,9 @@ public:
             for(int i = 0; i < 9; i++)
             {
                stiff_mat.diag[global_indices[i]] = 1;
-               sigma_mass_mat.diag[global_indices[i]] = 1;
-               chi_mass_mat.diag[global_indices[i]] = 1;
+               sigma_mass_mat.diag[global_indices[i]] = 0;
+               chi_mass_mat.diag[global_indices[i]] = 0;
                b[global_indices[i]] = 0;
-
                location[global_indices[i]] = 2;
             }
          }
@@ -472,6 +468,7 @@ public:
                   double val_l = (1.0 / 90.0) * 
                      (hy / hx * (Gl[0].bot_tr[i_in_prof] * lambda[0] + Gl[1].bot_tr[i_in_prof] * lambda[1] + Gl[2].bot_tr[i_in_prof] * lambda[2] + Gl[3].bot_tr[i_in_prof] * lambda[3]) +
                       hx / hy * (Gr[0].bot_tr[i_in_prof] * lambda[0] + Gr[1].bot_tr[i_in_prof] * lambda[1] + Gr[2].bot_tr[i_in_prof] * lambda[2] + Gr[3].bot_tr[i_in_prof] * lambda[3]));
+                  
                   //double val_u = (test.lambda(x, y) / 90.0) * (hy / hx * G1.top_tr[i_in_prof] + hx / hy * G2.top_tr[i_in_prof]);
                   double val_u = (1.0 / 90.0) * 
                      (hy / hx * (Gl[0].top_tr[i_in_prof] * lambda[0] + Gl[1].top_tr[i_in_prof] * lambda[1] + Gl[2].top_tr[i_in_prof] * lambda[2] + Gl[3].top_tr[i_in_prof] * lambda[3]) +
