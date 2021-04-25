@@ -63,6 +63,7 @@ public:
    vector<double> Moqj_2;          // Вспомогательный вектор для итерации по времени
    vector<double> Moqj_3;          // Вспомогательный вектор для итерации по времени
 
+   // Считывание и формирование сетки по времени из файла file_name
    void ReadFormTimeGrid(const string& file_name)
    {
       ifstream fin(file_name);
@@ -81,7 +82,7 @@ public:
       fin.close();
    }
 
-    // Считывание и формирование сетки из файла file_name
+   // Считывание и формирование сетки из файла file_name
    void ReadFormGrid(const string& file_name)
    {
       ifstream fin(file_name);
@@ -229,8 +230,8 @@ public:
    // Выделение памяти под массивы
    void InitializeMemory()
    {
-      slae = SLAE(nodes_count, 1000, 1e-20);
-      fac_slae = SLAE(nodes_count, 1000, 1e-20);
+      slae = SLAE(nodes_count, 10000, 1e-20);
+      fac_slae = SLAE(nodes_count, 10000, 1e-20);
 
       global.ind = vector<int>(nodes_count + 1);
       b = vector<double>(nodes_count);
@@ -669,30 +670,43 @@ public:
       fout << setw(14) << "x" << setw(14) << "y";
       fout << setw(14) << "prec" << setw(14) << "calc" << setw(14) << "diff" << setw(5) << "n" << " loc" << endl;
 
+      double norm = 0, norm_u = 0;
+
       for(int y_i = 0; y_i < y_nodes_count; y_i++)
       {
          for(int x_i = 0; x_i < x_nodes_count; x_i++)
          {
             int i = x_i + y_i * x_nodes_count;
 
-            fout << scientific;
-            fout << setw(14) << x_nodes[x_i];
-            fout << setw(14) << y_nodes[y_i];
-            fout << setw(14) << true_solution[i];
-            fout << setw(14) << solution[i];
-            fout << setw(14) << abs(true_solution[i] - solution[i]);
-            fout << fixed << setw(5) << i;
+            double prec = true_solution[i];
+            double calc = solution[i];
 
-            
-            if(location[i] == 2)
-               fout << " outer";
-            else if(location[i] == 1)
-               fout << " border";
-            else
-               fout << " inner";
+            if(x_i % 32 == 0 && y_i % 32 == 0)
+            {
+               fout << scientific;
+               fout << setw(14) << x_nodes[x_i];
+               fout << setw(14) << y_nodes[y_i];
+               fout << setw(14) << prec;
+               fout << setw(14) << calc;
+               fout << setw(14) << abs(true_solution[i] - solution[i]);
+               fout << fixed << setw(5) << i;
 
-            fout << endl;
+               if(location[i] == 2)
+                  fout << " outer";
+               else if(location[i] == 1)
+                  fout << " border";
+               else
+                  fout << " inner";
+
+               fout << endl;
+
+            }
+            norm_u += prec * prec;
+            norm += abs(prec - calc) * abs(prec - calc);
          }
       }
+
+      fout << "||u-u*||/||u*|| = " << scientific << sqrt(norm) / sqrt(norm_u) << endl;
+      fout << "||u-u*||" << scientific << sqrt(norm) << endl;
    }
 };

@@ -20,7 +20,7 @@ public:
 
    double lambda(const double& x, const double& y)
    {
-      return x * x;
+      return 1;
    }
 
    // Точное решение
@@ -29,10 +29,10 @@ public:
       switch(N)
       {
          case(0): return 2.0;
-         case(1): return x + t * t * t;
+         case(1): return x + y;
          case(2): return x * x + y * y;
          case(3): return x * x * x + y * y * y;
-         case(4): return x * x * x * x;
+         case(4): return x * x * x * x + y * y * y * y;
       };
    }
 
@@ -41,7 +41,10 @@ public:
       switch(N)
       {
          case(0): return 0;
-         case(1): return 2 * x;
+         case(1): return 0;
+         case(2): return 4;
+         case(3): return 4;
+         case(4): return 12 * x * x + 12 * y * y;
       };
    }
 
@@ -61,7 +64,7 @@ public:
       switch(N)
       {
          case(0): return 0;
-         case(1): return 3 * t * t;
+         case(1): return 0;
          case(2): return 0;
          case(3): return 0;
          case(4): return 0;
@@ -74,7 +77,7 @@ public:
       switch(N)
       {
          case(0): return 0;
-         case(1): return 6 * t;
+         case(1): return 0;
          case(2): return 0;
          case(3): return 0;
          case(4): return 0;
