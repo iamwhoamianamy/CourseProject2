@@ -1,7 +1,5 @@
 #pragma once
 #include <vector>
-#include <iomanip>
-#include <fstream>
 using namespace std;
 
 // Умножение вектора на число
@@ -29,6 +27,7 @@ vector<double> operator - (vector<double> vec1, const vector<double>& vec2)
    return vec1;
 }
 
+// Скалярное произведение векторов
 double ScalarMult(const vector<double>& vec1, const vector<double>& vec2)
 {
    double res = 0;
@@ -37,11 +36,13 @@ double ScalarMult(const vector<double>& vec1, const vector<double>& vec2)
    return res;
 }
 
+// Скалярное произведение векторов
 double operator * (const vector<double>& vec1, const vector<double>& vec2)
 {
    return ScalarMult(vec1, vec2);
 }
 
+// Норма вектора
 double Norm(const vector<double>& vec)
 {
    return sqrt(ScalarMult(vec, vec));

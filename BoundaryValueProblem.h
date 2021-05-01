@@ -15,10 +15,8 @@ public:
    Matrix sigma_mass_mat;         // Матрица массы для параметра Сигма
    Matrix chi_mass_mat;           // Матрица массы для параметра Хи
    Matrix  M;                     // Вспомогательные матрицы для вычисления элементов
-                                  // локальных матриц и векторов правых частей
-
-   vector<Matrix> Gl, Gr;
-
+   vector<Matrix> Gl, Gr;         // локальных матриц и векторов правых частей
+   
    SLAE slae;                     // Решатель системы без предобуславливания
    SLAE fac_slae;                 // Решатель системы c предобуславливанием
 
@@ -209,7 +207,6 @@ public:
    // матриц жесткости и массы
    void ReadMatrices()
    {
-      // Чтение вспомогательных матриц для построения матриц жесткости и массы
       M = Matrix(9);
       M.ReadDiTr("data/M1.txt");
 
@@ -259,12 +256,11 @@ public:
    }
 
    // Заполнение массива global_indices индексами, соответствующими глобальной номерации
-   // узлов конечного элемента с номером elem_index(индексация с нуля)
-   void CalcGlobalIndices(int elem_index, vector<int>& global_indices)
+   // узлов конечного элемента с номером elem_i(индексация с нуля)
+   void CalcGlobalIndices(int elem_i, vector<int>& global_indices)
    {
       int n_coords = x_nodes_count / 2 + 1;
-      int k = 2 * floor((elem_index) / (n_coords - 1)) * (2 * n_coords - 1) + 2 * ((elem_index) % (n_coords - 1)) + 1;
-      k--;
+      int k = 2 * floor((elem_i) / (n_coords - 1)) * (2 * n_coords - 1) + 2 * ((elem_i) % (n_coords - 1));
 
       global_indices[0] = k + 0;
       global_indices[1] = k + 1;
@@ -280,11 +276,11 @@ public:
    }
 
    // Поиск региона по номеру конечного элемента
-   int CalcRegionIndex(const int& elem_index)
+   int CalcRegionIndex(const int& elem_i)
    {
       int n_coords = x_nodes_count / 2 + 1;
-      int x0 = (elem_index) % (n_coords - 1) * 2 + 1;
-      int y0 = floor((elem_index) / (n_coords - 1)) * 2 + 1;
+      int x0 = (elem_i) % (n_coords - 1) * 2 + 1;
+      int y0 = floor((elem_i) / (n_coords - 1)) * 2 + 1;
 
       int found_reg_i = -1;
 
@@ -338,7 +334,7 @@ public:
       {
          int reg_i = CalcRegionIndex(elem_i);
 
-         //if(reg_i != -1)
+         if(reg_i != -1)
          {
             vector<int> global_indices(9);
             CalcGlobalIndices(elem_i, global_indices);
@@ -370,7 +366,8 @@ public:
       chi_mass_mat = global;
    }
 
-   // Добавление элемента в матрицу
+   // Добавление элемента в матрицу в строку row_i столбец col_i
+   // val_l добавляется в нижний треугольник, val_u добавляется в верхний треугольник
    void AddToMat(Matrix& mat, const int& row_i, const int& col_i, const double& val_l, const double& val_u)
    {
       int beg_prof = mat.ind[row_i];
@@ -388,12 +385,12 @@ public:
    }
 
    // Находит координаты узлов конечного элемента
-   // с номером elem_index(индексация с нуля)
-   void CalcElemNodes(int elem_index, vector<double>& x_nodes_elem, vector<double>& y_nodes_elem)
+   // с номером elem_i(индексация с нуля)
+   void CalcElemNodes(int elem_i, vector<double>& x_nodes_elem, vector<double>& y_nodes_elem)
    {
       int n_coords = x_nodes_count / 2 + 1;
-      int x0 = (elem_index) % (n_coords - 1) * 2;
-      int y0 = floor((elem_index) / (n_coords - 1)) * 2;
+      int x0 = (elem_i) % (n_coords - 1) * 2;
+      int y0 = floor((elem_i) / (n_coords - 1)) * 2;
 
       x_nodes_elem[0] = x_nodes[x0];
       x_nodes_elem[1] = x_nodes[x0 + 1];
@@ -510,13 +507,12 @@ public:
       }
    }
 
-   // Учет первых краевых условий на строкес с номером line_i
+   // Учет первых краевых условий на строке с номером line_i
    void FirstBoundOnLine(const int& line_i, const double& x, const double& y, const double& t)
    {
       global.diag[line_i] = 1;
       true_solution[line_i] = test.u(x, y, t);
       b[line_i] = test.u(x, y, t);
-
 
       for(int prof_i = global.ind[line_i]; prof_i < global.ind[line_i + 1]; prof_i++)
       {
@@ -533,7 +529,7 @@ public:
       }
    }
 
-   // Учет первых краевых условий
+   // Учет первых краевых условий в СЛАУ на временном слое t
    void AccountFirstBound(const double& t)
    {
       for(int x_i = 0; x_i < x_nodes_count; x_i++)
@@ -555,7 +551,7 @@ public:
       }
    }
 
-   // Нахождение решения
+   // Нахождение решения СЛАУ
    void Solve()
    {
       slae.b = b;
@@ -681,7 +677,7 @@ public:
             double prec = true_solution[i];
             double calc = solution[i];
 
-            if(x_i % 32 == 0 && y_i % 32 == 0)
+            //if(x_i % 32 == 0 && y_i % 32 == 0)
             {
                fout << scientific;
                fout << setw(14) << x_nodes[x_i];
