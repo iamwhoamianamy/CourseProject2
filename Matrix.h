@@ -100,6 +100,12 @@ public:
       }
    }
 
+   // Функция умножения матрицы на вектор vec, результат в res
+   void MatVecMult(const vector<double>& vec, vector<double>& res)
+   {
+      MatVecMult(vec, res, bot_tr, top_tr);
+   }
+
    // Функция считывания диагонали и треугольников из файлов
    void ReadDiTr(const string& file_name)
    {
