@@ -3,21 +3,6 @@
 
 using namespace std;
 
-double phi1(double t)
-{
-   return 2 * (t - 0.5) * (t - 1);
-}
-
-double phi2(double t)
-{
-   return -4 * t * (t - 1);
-}
-
-double phi3(double t)
-{
-   return 2 * t * (t - 0.5);
-}
-
 int main()
 {
    BoundaryValueProblem bvp;

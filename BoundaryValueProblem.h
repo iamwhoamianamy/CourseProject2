@@ -711,16 +711,6 @@ public:
       return 2 * t * (t - 0.5);
    }
 
-   double psi1(double t)
-   {
-      return 1 - t;
-   }
-
-   double psi2(double t)
-   {
-      return t;
-   }
-
    // ¬ывод решени€ на временном слое t в поток fout 
    void PrintSolution(ofstream& fout, const double& t)
    {
